@@ -2,15 +2,18 @@ package com.pushpanshu.youtubecollaborationtool.controller;
 
 import com.pushpanshu.youtubecollaborationtool.model.FileType;
 import com.pushpanshu.youtubecollaborationtool.services.AwsService;
+import com.pushpanshu.youtubecollaborationtool.utils.ProgressTrackingInputStream;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,36 +39,45 @@ public class AwsController {
 
     // Endpoint to upload a file to a bucket
     @PostMapping("/upload")
-    @SneakyThrows(IOException.class)
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
-
-
+//    @SneakyThrows(IOException.class)
+    public ResponseEntity<SseEmitter> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File is empty");
+            return ResponseEntity.badRequest().body(null);
         }
-        int dotIndex = file.getOriginalFilename().indexOf(".");
-        String fileName = StringUtils.cleanPath(
-                Objects.requireNonNull(
-                        file.getOriginalFilename().substring(0, dotIndex) + LocalDateTime.now()
-                ).replaceAll("[:&.]", "_") // Use replaceAll instead of replace
-        );
 
-        fileName += StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename().substring(dotIndex)));
+        SseEmitter emitter = new SseEmitter();
 
-        String contentType = file.getContentType();
-        long fileSize = file.getSize();
-        InputStream inputStream = file.getInputStream();
+        new Thread(() -> {
+            try {
+                int dotIndex = Objects.requireNonNull(file.getOriginalFilename()).indexOf(".");
+                String fileName = StringUtils.cleanPath(
+                        (file.getOriginalFilename().substring(0, dotIndex) + LocalDateTime.now()).replaceAll("[:&.]", "_")
+                );
+                fileName += StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename().substring(dotIndex)));
 
-        service.uploadFile(bucketName, fileName, fileSize, contentType, inputStream);
+                String contentType = file.getContentType();
+                long fileSize = file.getSize();
+                InputStream inputStream = new ProgressTrackingInputStream(file.getInputStream(), fileSize, emitter);
 
-        return ResponseEntity.ok().body("File uploaded successfully");
+                service.uploadFile(bucketName, fileName, fileSize, contentType, inputStream);
+
+                emitter.send("Upload completed!", MediaType.APPLICATION_JSON);
+                emitter.send("File: "+fileName, MediaType.APPLICATION_JSON);
+                emitter.complete();
+
+            } catch (IOException ex) {
+                emitter.completeWithError(ex);
+            }
+        }).start();
+
+        return ResponseEntity.ok().body(emitter);
     }
+
 
     // Endpoint to download a file from a bucket
     @SneakyThrows
     @GetMapping("/download/{fileName}")
     public ResponseEntity<?> downloadFile(@PathVariable("fileName") String fileName) {
-
 
         val body = service.downloadFile(bucketName, fileName);
 
@@ -78,8 +90,6 @@ public class AwsController {
     // Endpoint to delete a file from a bucket
     @DeleteMapping("/{fileName}")
     public ResponseEntity<?> deleteFile(@PathVariable("fileName") String fileName) {
-
-
         service.deleteFile(bucketName, fileName);
         return ResponseEntity.ok().build();
     }
