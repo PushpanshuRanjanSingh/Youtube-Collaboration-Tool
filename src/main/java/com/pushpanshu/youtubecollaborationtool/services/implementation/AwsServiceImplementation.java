@@ -8,7 +8,6 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.pushpanshu.youtubecollaborationtool.services.AwsService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -21,8 +20,11 @@ import java.util.List;
 @Service
 public class AwsServiceImplementation implements AwsService {
 
-    @Autowired
-    private AmazonS3 s3Client;
+    private final AmazonS3 s3Client;
+
+    public AwsServiceImplementation(AmazonS3 s3Client) {
+        this.s3Client = s3Client;
+    }
 
     // Method to upload a file to an S3 bucket
     @Override
@@ -74,8 +76,8 @@ public class AwsServiceImplementation implements AwsService {
             }
 
             objectSummaries.stream()
-                    .filter(item -> !item.getKey().endsWith("/"))
                     .map(S3ObjectSummary::getKey)
+                    .filter(key -> !key.endsWith("/"))
                     .forEach(keys::add);
 
             objectListing = s3Client.listNextBatchOfObjects(objectListing);

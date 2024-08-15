@@ -62,7 +62,7 @@ public class AwsController {
                 service.uploadFile(bucketName, fileName, fileSize, contentType, inputStream);
 
                 emitter.send("Upload completed!", MediaType.APPLICATION_JSON);
-                emitter.send("File: "+fileName, MediaType.APPLICATION_JSON);
+                emitter.send("File: " + fileName, MediaType.APPLICATION_JSON);
                 emitter.complete();
 
             } catch (IOException ex) {

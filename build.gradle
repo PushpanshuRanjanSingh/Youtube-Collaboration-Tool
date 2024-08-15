@@ -33,6 +33,12 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation group: 'com.amazonaws', name: 'aws-java-sdk', version: '1.12.767'
+//    Server Side Event Uni-directional transmission
+    implementation group: 'org.springframework', name: 'spring-webmvc', version: '6.1.11'
+    implementation group: 'javax.xml.bind', name: 'jaxb-api', version: '2.3.1'
+//    RabbitMQ
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    testImplementation 'org.springframework.amqp:spring-rabbit-test'
 
 }
 
