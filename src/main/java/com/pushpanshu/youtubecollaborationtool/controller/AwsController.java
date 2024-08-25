@@ -2,10 +2,11 @@ package com.pushpanshu.youtubecollaborationtool.controller;
 
 import com.pushpanshu.youtubecollaborationtool.model.FileType;
 import com.pushpanshu.youtubecollaborationtool.services.AwsService;
+import com.pushpanshu.youtubecollaborationtool.utils.AppConstant;
 import com.pushpanshu.youtubecollaborationtool.utils.ProgressTrackingInputStream;
 import lombok.SneakyThrows;
 import lombok.val;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,8 +27,13 @@ public class AwsController {
 
     @Value("${cloud.aws.s3.bucket}")
     String bucketName;
-    @Autowired
-    private AwsService service;
+    private final AwsService service;
+    private final RabbitTemplate rabbitTemplate;
+
+    public AwsController(AwsService service, RabbitTemplate rabbitTemplate) {
+        this.service = service;
+        this.rabbitTemplate = rabbitTemplate;
+    }
 
     // Endpoint to list files in a bucket
     @GetMapping("/media")
@@ -64,6 +70,7 @@ public class AwsController {
                 emitter.send("Upload completed!", MediaType.APPLICATION_JSON);
                 emitter.send("File: " + fileName, MediaType.APPLICATION_JSON);
                 emitter.complete();
+                rabbitTemplate.convertAndSend(AppConstant.RMQExchange, AppConstant.RMQRoutingKey,fileName);
 
             } catch (IOException ex) {
                 emitter.completeWithError(ex);
